@@ -2,7 +2,7 @@ pragma solidity 0.6.12;
 
 import "./libs/token/BEP20/BEP20.sol";
 
-import "./CakeToken.sol";
+import "./OatToken.sol";
 
 // SyrupBar with Governance.
 contract SyrupBar is BEP20('SyrupBar Token', 'SYRUP') {
@@ -18,11 +18,11 @@ contract SyrupBar is BEP20('SyrupBar Token', 'SYRUP') {
     }
 
     // The CAKE TOKEN!
-    CakeToken public cake;
+    OatToken public cake;
 
 
     constructor(
-        CakeToken _cake
+        OatToken _cake
     ) public {
         cake = _cake;
     }

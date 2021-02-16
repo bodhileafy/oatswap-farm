@@ -5,7 +5,7 @@ import './libs/token/BEP20/IBEP20.sol';
 import './libs/token/BEP20/SafeBEP20.sol';
 import '@openzeppelin/contracts/access/Ownable.sol';
 
-import "./CakeToken.sol";
+import "./OatToken.sol";
 import "./SyrupBar.sol";
 
 // import "@nomiclabs/buidler/console.sol";
@@ -60,7 +60,7 @@ contract MasterChef is Ownable {
     }
 
     // The CAKE TOKEN!
-    CakeToken public cake;
+    OatToken public cake;
     // The SYRUP TOKEN!
     SyrupBar public syrup;
     // Dev address.
@@ -86,7 +86,7 @@ contract MasterChef is Ownable {
     event EmergencyWithdraw(address indexed user, uint256 indexed pid, uint256 amount);
 
     constructor(
-        CakeToken _cake,
+        OatToken _cake,
         SyrupBar _syrup,
         address _devaddr,
         uint256 _cakePerBlock,
