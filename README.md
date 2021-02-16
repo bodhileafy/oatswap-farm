@@ -1,6 +1,6 @@
 # OatSwap Farming 🌾🌾🌾
 
-https://oatswap.info. Feel free to read the code. More details coming soon.
+https://oatswap.org. Feel free to read the code. More details coming soon.
 
 ## Deployed Contracts / Hash
 
