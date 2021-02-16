@@ -25,19 +25,19 @@ contract('SyrupBar', ([alice, bob, carol, dev, minter]) => {
     assert.equal((await this.syrup.totalSupply()).toString(), '1800');
   });
 
-  it('safeCakeTransfer', async () => {
+  it('safeOatTransfer', async () => {
     assert.equal(
       (await this.oat.balanceOf(this.syrup.address)).toString(),
       '0'
     );
     await this.oat.mint(this.syrup.address, 1000, { from: minter });
-    await this.syrup.safeCakeTransfer(bob, 200, { from: minter });
+    await this.syrup.safeOatTransfer(bob, 200, { from: minter });
     assert.equal((await this.oat.balanceOf(bob)).toString(), '200');
     assert.equal(
       (await this.oat.balanceOf(this.syrup.address)).toString(),
       '800'
     );
-    await this.syrup.safeCakeTransfer(bob, 2000, { from: minter });
+    await this.syrup.safeOatTransfer(bob, 2000, { from: minter });
     assert.equal((await this.oat.balanceOf(bob)).toString(), '1000');
   });
 });

@@ -15,16 +15,16 @@ contract LotteryRewardPool is Ownable {
     address public adminAddress;
     address public receiver;
     IBEP20 public lptoken;
-    IBEP20 public cake;
+    IBEP20 public oat;
 
     constructor(
         MasterChef _chef,
-        IBEP20 _cake,
+        IBEP20 _oat,
         address _admin,
         address _receiver
     ) public {
         chef = _chef;
-        cake = _cake;
+        oat = _oat;
         adminAddress = _admin;
         receiver = _receiver;
     }
@@ -46,8 +46,8 @@ contract LotteryRewardPool is Ownable {
 
     function  harvest(uint256 _pid) external onlyAdmin {
         chef.deposit(_pid, 0);
-        uint256 balance = cake.balanceOf(address(this));
-        cake.safeTransfer(receiver, balance);
+        uint256 balance = oat.balanceOf(address(this));
+        oat.safeTransfer(receiver, balance);
         emit Harvest(msg.sender, _pid);
     }
 
@@ -56,12 +56,12 @@ contract LotteryRewardPool is Ownable {
     }
 
     function  pendingReward(uint256 _pid) external view returns (uint256) {
-        return chef.pendingCake(_pid, address(this));
+        return chef.pendingOat(_pid, address(this));
     }
 
     // EMERGENCY ONLY.
     function emergencyWithdraw(IBEP20 _token, uint256 _amount) external onlyOwner {
-        cake.safeTransfer(address(msg.sender), _amount);
+        oat.safeTransfer(address(msg.sender), _amount);
         emit EmergencyWithdraw(msg.sender, _amount);
     }
 
