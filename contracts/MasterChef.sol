@@ -2,13 +2,12 @@
 
 pragma solidity 0.6.12;
 
-import '@openzeppelin/contracts/math/SafeMath.sol';
-import './libs/token/BEP20/IBEP20.sol';
-import './libs/token/BEP20/SafeBEP20.sol';
-import '@openzeppelin/contracts/access/Ownable.sol';
+import "@openzeppelin/contracts/math/SafeMath.sol";
+import "./libs/token/BEP20/IBEP20.sol";
+import "./libs/token/BEP20/SafeBEP20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
 import "./OatToken.sol";
-import "./SyrupBar.sol";
 
 // MasterChef is the master of Oat. He can make Oat and he is a fair guy.
 //
@@ -44,14 +43,15 @@ contract MasterChef is Ownable {
         uint256 allocPoint;       // How many allocation points assigned to this pool. OATs to distribute per block.
         uint256 lastRewardBlock;  // Last block number that OATs distribution occurs.
         uint256 accOatPerShare; // Accumulated OATs per share, times 1e12. See below.
+        uint16 depositFeeBPS; // Deposit fee in basis points
     }
 
     // The OAT TOKEN!
     OatToken public oat;
-    // The SYRUP TOKEN!
-    SyrupBar public syrup;
     // Dev address.
-    address public devaddr;
+    address public devAddress;
+    // Fee address.
+    address public feeAddress;
     // OAT tokens created per block.
     uint256 public oatPerBlock;
     // Bonus muliplier for early oat makers.
@@ -72,27 +72,15 @@ contract MasterChef is Ownable {
 
     constructor(
         OatToken _oat,
-        SyrupBar _syrup,
-        address _devaddr,
         uint256 _oatPerBlock,
         uint256 _startBlock
     ) public {
         oat = _oat;
-        syrup = _syrup;
-        devaddr = _devaddr;
         oatPerBlock = _oatPerBlock;
         startBlock = _startBlock;
 
-        // staking pool
-        poolInfo.push(PoolInfo({
-            lpToken: _oat,
-            allocPoint: 1000,
-            lastRewardBlock: startBlock,
-            accOatPerShare: 0
-        }));
-
-        totalAllocPoint = 1000;
-
+        devAddress = msg.sender;
+        feeAddress = msg.sender;
     }
 
     function updateMultiplier(uint256 multiplierNumber) public onlyOwner {
@@ -105,7 +93,9 @@ contract MasterChef is Ownable {
 
     // Add a new lp to the pool. Can only be called by the owner.
     // XXX DO NOT add the same LP token more than once. Rewards will be messed up if you do.
-    function add(uint256 _allocPoint, IBEP20 _lpToken, bool _withUpdate) public onlyOwner {
+    function add(uint256 _allocPoint, IBEP20 _lpToken, uint16 _depositFeeBPS, bool _withUpdate) public onlyOwner {
+        require(_depositFeeBPS <= 10000, "add: invalid deposit fee");
+
         if (_withUpdate) {
             massUpdatePools();
         }
@@ -115,34 +105,23 @@ contract MasterChef is Ownable {
             lpToken: _lpToken,
             allocPoint: _allocPoint,
             lastRewardBlock: lastRewardBlock,
-            accOatPerShare: 0
+            accOatPerShare: 0,
+            depositFeeBPS: _depositFeeBPS
         }));
-        updateStakingPool();
     }
 
     // Update the given pool's OAT allocation point. Can only be called by the owner.
-    function set(uint256 _pid, uint256 _allocPoint, bool _withUpdate) public onlyOwner {
+    function set(uint256 _pid, uint256 _allocPoint, uint16 _depositFeeBPS, bool _withUpdate) public onlyOwner {
+        require(_depositFeeBPS <= 10000, "set: invalid deposit fee");
+
         if (_withUpdate) {
             massUpdatePools();
         }
         uint256 prevAllocPoint = poolInfo[_pid].allocPoint;
         poolInfo[_pid].allocPoint = _allocPoint;
+        poolInfo[_pid].depositFeeBPS = _depositFeeBPS;
         if (prevAllocPoint != _allocPoint) {
             totalAllocPoint = totalAllocPoint.sub(prevAllocPoint).add(_allocPoint);
-            updateStakingPool();
-        }
-    }
-
-    function updateStakingPool() internal {
-        uint256 length = poolInfo.length;
-        uint256 points = 0;
-        for (uint256 pid = 1; pid < length; ++pid) {
-            points = points.add(poolInfo[pid].allocPoint);
-        }
-        if (points != 0) {
-            points = points.div(3);
-            totalAllocPoint = totalAllocPoint.sub(poolInfo[0].allocPoint).add(points);
-            poolInfo[0].allocPoint = points;
         }
     }
 
@@ -173,7 +152,6 @@ contract MasterChef is Ownable {
         }
     }
 
-
     // Update reward variables of the given pool to be up-to-date.
     function updatePool(uint256 _pid) public {
         PoolInfo storage pool = poolInfo[_pid];
@@ -181,23 +159,20 @@ contract MasterChef is Ownable {
             return;
         }
         uint256 lpSupply = pool.lpToken.balanceOf(address(this));
-        if (lpSupply == 0) {
+        if (lpSupply == 0 || pool.allocPoint == 0) {
             pool.lastRewardBlock = block.number;
             return;
         }
         uint256 multiplier = getMultiplier(pool.lastRewardBlock, block.number);
         uint256 oatReward = multiplier.mul(oatPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
-        oat.mint(devaddr, oatReward.div(10));
-        oat.mint(address(syrup), oatReward);
+        oat.mint(devAddress, oatReward.div(10));
+        oat.mint(address(this), oatReward);
         pool.accOatPerShare = pool.accOatPerShare.add(oatReward.mul(1e12).div(lpSupply));
         pool.lastRewardBlock = block.number;
     }
 
     // Deposit LP tokens to MasterChef for OAT allocation.
     function deposit(uint256 _pid, uint256 _amount) public {
-
-        require (_pid != 0, 'deposit OAT by staking');
-
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
         updatePool(_pid);
@@ -209,7 +184,13 @@ contract MasterChef is Ownable {
         }
         if (_amount > 0) {
             pool.lpToken.safeTransferFrom(address(msg.sender), address(this), _amount);
-            user.amount = user.amount.add(_amount);
+            if (pool.depositFeeBPS > 0) {
+                uint256 depositFee = _amount.mul(pool.depositFeeBPS).div(10000);
+                pool.lpToken.safeTransfer(feeAddress, depositFee);
+                user.amount = user.amount.add(_amount).sub(depositFee);
+            } else {
+                user.amount = user.amount.add(_amount);
+            }
         }
         user.rewardDebt = user.amount.mul(pool.accOatPerShare).div(1e12);
         emit Deposit(msg.sender, _pid, _amount);
@@ -217,8 +198,6 @@ contract MasterChef is Ownable {
 
     // Withdraw LP tokens from MasterChef.
     function withdraw(uint256 _pid, uint256 _amount) public {
-
-        require (_pid != 0, 'withdraw OAT by unstaking');
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
         require(user.amount >= _amount, "withdraw: not good");
@@ -236,65 +215,42 @@ contract MasterChef is Ownable {
         emit Withdraw(msg.sender, _pid, _amount);
     }
 
-    // Stake OAT tokens to MasterChef
-    function enterStaking(uint256 _amount) public {
-        PoolInfo storage pool = poolInfo[0];
-        UserInfo storage user = userInfo[0][msg.sender];
-        updatePool(0);
-        if (user.amount > 0) {
-            uint256 pending = user.amount.mul(pool.accOatPerShare).div(1e12).sub(user.rewardDebt);
-            if(pending > 0) {
-                safeOatTransfer(msg.sender, pending);
-            }
-        }
-        if(_amount > 0) {
-            pool.lpToken.safeTransferFrom(address(msg.sender), address(this), _amount);
-            user.amount = user.amount.add(_amount);
-        }
-        user.rewardDebt = user.amount.mul(pool.accOatPerShare).div(1e12);
-
-        syrup.mint(msg.sender, _amount);
-        emit Deposit(msg.sender, 0, _amount);
-    }
-
-    // Withdraw OAT tokens from STAKING.
-    function leaveStaking(uint256 _amount) public {
-        PoolInfo storage pool = poolInfo[0];
-        UserInfo storage user = userInfo[0][msg.sender];
-        require(user.amount >= _amount, "withdraw: not good");
-        updatePool(0);
-        uint256 pending = user.amount.mul(pool.accOatPerShare).div(1e12).sub(user.rewardDebt);
-        if(pending > 0) {
-            safeOatTransfer(msg.sender, pending);
-        }
-        if(_amount > 0) {
-            user.amount = user.amount.sub(_amount);
-            pool.lpToken.safeTransfer(address(msg.sender), _amount);
-        }
-        user.rewardDebt = user.amount.mul(pool.accOatPerShare).div(1e12);
-
-        syrup.burn(msg.sender, _amount);
-        emit Withdraw(msg.sender, 0, _amount);
-    }
-
     // Withdraw without caring about rewards. EMERGENCY ONLY.
     function emergencyWithdraw(uint256 _pid) public {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
-        pool.lpToken.safeTransfer(address(msg.sender), user.amount);
-        emit EmergencyWithdraw(msg.sender, _pid, user.amount);
+        uint256 amount = user.amount;
         user.amount = 0;
         user.rewardDebt = 0;
+        pool.lpToken.safeTransfer(address(msg.sender), amount);
+        emit EmergencyWithdraw(msg.sender, _pid, amount);
     }
 
     // Safe oat transfer function, just in case if rounding error causes pool to not have enough OATs.
     function safeOatTransfer(address _to, uint256 _amount) internal {
-        syrup.safeOatTransfer(_to, _amount);
+        uint256 oatBal = oat.balanceOf(address(this));
+        if (_amount > oatBal) {
+            oat.transfer(_to, oatBal);
+        } else {
+            oat.transfer(_to, _amount);
+        }
     }
 
     // Update dev address by the previous dev.
-    function dev(address _devaddr) public {
-        require(msg.sender == devaddr, "dev: wut?");
-        devaddr = _devaddr;
+    function setDevAddress(address _devAddress) public {
+        require(msg.sender == devAddress, "setDevAddress: unauthorized");
+        devAddress = _devAddress;
+    }
+
+    // Update fee address by the previous fee recipient.
+    function setFeeAddress(address _feeAddress) public {
+        require(msg.sender == feeAddress, "setFeeAddress: unauthorized");
+        feeAddress = _feeAddress;
+    }
+
+    //Pancake has to add hidden dummy pools in order to alter the emission, here we make it simple and transparent to all.
+    function updateEmissionRate(uint256 _oatPerBlock) public onlyOwner {
+        massUpdatePools();
+        oatPerBlock = _oatPerBlock;
     }
 }
