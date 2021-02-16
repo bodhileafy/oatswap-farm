@@ -1,12 +1,12 @@
 const { advanceBlockTo } = require('@openzeppelin/test-helpers/src/time');
 const { assert } = require('chai');
-const CakeToken = artifacts.require('CakeToken');
+const OatToken = artifacts.require('OatToken');
 const SyrupBar = artifacts.require('SyrupBar');
 
 contract('SyrupBar', ([alice, bob, carol, dev, minter]) => {
   beforeEach(async () => {
-    this.cake = await CakeToken.new({ from: minter });
-    this.syrup = await SyrupBar.new(this.cake.address, { from: minter });
+    this.oat = await OatToken.new({ from: minter });
+    this.syrup = await SyrupBar.new(this.oat.address, { from: minter });
   });
 
   it('mint', async () => {
@@ -27,17 +27,17 @@ contract('SyrupBar', ([alice, bob, carol, dev, minter]) => {
 
   it('safeCakeTransfer', async () => {
     assert.equal(
-      (await this.cake.balanceOf(this.syrup.address)).toString(),
+      (await this.oat.balanceOf(this.syrup.address)).toString(),
       '0'
     );
-    await this.cake.mint(this.syrup.address, 1000, { from: minter });
+    await this.oat.mint(this.syrup.address, 1000, { from: minter });
     await this.syrup.safeCakeTransfer(bob, 200, { from: minter });
-    assert.equal((await this.cake.balanceOf(bob)).toString(), '200');
+    assert.equal((await this.oat.balanceOf(bob)).toString(), '200');
     assert.equal(
-      (await this.cake.balanceOf(this.syrup.address)).toString(),
+      (await this.oat.balanceOf(this.syrup.address)).toString(),
       '800'
     );
     await this.syrup.safeCakeTransfer(bob, 2000, { from: minter });
-    assert.equal((await this.cake.balanceOf(bob)).toString(), '1000');
+    assert.equal((await this.oat.balanceOf(bob)).toString(), '1000');
   });
 });
