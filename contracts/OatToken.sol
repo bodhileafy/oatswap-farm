@@ -6,10 +6,26 @@ import "./libs/token/BEP20/BEP20.sol";
 
 // OatToken with Governance.
 contract OatToken is BEP20("OatSwap Token", "OAT") {
+
+    uint256 private _totalBurned;
+
+    function totalBurned() public view returns (uint256) {
+        return _totalBurned;
+    }
+
     /// @notice Creates `_amount` token to `_to`. Must only be called by the owner (MasterChef).
     function mint(address _to, uint256 _amount) public onlyOwner {
         _mint(_to, _amount);
         _moveDelegates(address(0), _delegates[_to], _amount);
+    }
+
+    /// @notice Can be called by any holder
+    function burn(uint256 _amount) public {
+        require(_amount > 0, "OAT::burn: burn amount must be greater than zero");
+
+        _burn(_msgSender(), _amount);
+        _moveDelegates(_delegates[_msgSender()], address(0), _amount);
+        _totalBurned = _totalBurned.add(_amount);
     }
 
     // Copied and modified from YAM code:
