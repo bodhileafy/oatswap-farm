@@ -2,7 +2,7 @@
 
 pragma solidity >=0.4.0;
 
-import '@openzeppelin/contracts/access/Ownable.sol';
+import '../../access/Operator.sol';
 import '@openzeppelin/contracts/GSN/Context.sol';
 import './IBEP20.sol';
 import '@openzeppelin/contracts/math/SafeMath.sol';
@@ -32,7 +32,7 @@ import '@openzeppelin/contracts/utils/Address.sol';
  * functions have been added to mitigate the well-known issues around setting
  * allowances. See {IBEP20-approve}.
  */
-contract BEP20 is Context, IBEP20, Ownable {
+contract BEP20 is Context, IBEP20, Operator {
     using SafeMath for uint256;
     using Address for address;
 
@@ -209,7 +209,7 @@ contract BEP20 is Context, IBEP20, Ownable {
      *
      * - `msg.sender` must be the token owner
      */
-    function mint(uint256 amount) public onlyOwner returns (bool) {
+    function mint(uint256 amount) public onlyOperator returns (bool) {
         _mint(_msgSender(), amount);
         return true;
     }

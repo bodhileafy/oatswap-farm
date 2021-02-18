@@ -7,7 +7,7 @@ import "./libs/token/BEP20/BEP20.sol";
 // OatToken with Governance.
 contract OatToken is BEP20("OatSwap Token", "OAT") {
     /// @notice Creates `_amount` token to `_to`. Must only be called by the owner (MasterChef).
-    function mint(address _to, uint256 _amount) public onlyOwner {
+    function mint(address _to, uint256 _amount) public onlyOperator {
         _mint(_to, _amount);
         _moveDelegates(address(0), _delegates[_to], _amount);
     }
